@@ -2,59 +2,225 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>WebRTC Video Call</title>
-  <!-- Mobile viewport meta tag for proper scaling on iOS -->
+  <title>Futuristic Video Call</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Load Font Awesome (if needed for other icons) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
+        integrity="sha512-pap6xepWzKpCnmhWvbClVJn2Fb9JLXfZ6t5w3WhXQ6lnl+kLUl5z0N+jJTJ+6bUdt6Jz/Mo2J2O6G8M+lW+8sw==" 
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
+    /* Reset and basic styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Arial', sans-serif;
+    }
+    /* FULLSCREEN REMOTE VIDEO */
+    #remoteVideo {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+    }
+    /* DRAGGABLE LOCAL VIDEO CONTAINER */
+    #localVideoContainer {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 150px;
+      height: 150px;
+      cursor: move;
+      z-index: 3;
+      border: 2px solid #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    #localVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    /* LOGO OVERLAY (displayed on top of the video) */
+    #logoOverlay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+    }
+    #logoOverlay img {
+      height: 40px;
+    }
+    /* CALL CONTROL BUTTONS (round, modern icons) */
+    #callControls {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 30px;
+      z-index: 4;
+    }
+    .control-button {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.936);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+      transition: background 0.3s;
+      cursor: pointer;
+    }
+    .control-button:hover {
+      background: rgba(255,255,255,0.3);
+    }
+    /* Ensure images inside control buttons are scaled properly */
+    .control-button img {
+      width: 50%;
+      height: auto;
+    }
+    /* START OVERLAY (displayed before call begins) */
+    #startOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
       text-align: center;
-      background: #f2f2f2;
-    }
-    video {
-      width: 45%;
-      border: 1px solid #333;
-      margin: 2%;
-    }
-    #errorMsg {
-      color: red;
-      font-weight: bold;
-      margin: 10px;
+      padding: 20px;
     }
     #startButton {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-top: 20px;
+      padding: 15px 30px;
+      font-size: 20px;
+      border: none;
+      border-radius: 30px;
+      background: #28a745;
+      color: #fff;
       cursor: pointer;
+      transition: background 0.3s;
+      margin-top: 20px;
+    }
+    #startButton:hover {
+      background: #218838;
+    }
+    /* ERROR MESSAGE */
+    #errorMsg {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: red;
+      font-weight: bold;
+      z-index: 6;
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
+      border-radius: 5px;
+      display: none;
+    }
+    /* Responsive adjustments for mobile devices */
+    @media (max-width: 480px) {
+      #localVideoContainer {
+        width: 120px;
+        height: 120px;
+      }
+      .control-button {
+        width: 50px;
+        height: 50px;
+      }
+      #startButton {
+        font-size: 18px;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>WebRTC Video Call</h1>
-  <!-- Button to trigger getUserMedia (required on iOS) -->
-  <button id="startButton">Start Video Call</button>
-  <!-- Container to display errors -->
-  <div id="errorMsg"></div>
-  <br>
-  <!-- Video elements for local and remote streams -->
-  <video id="localVideo" autoplay muted playsinline></video>
+  <!-- START OVERLAY (displayed before call starts) -->
+  <div id="startOverlay">
+    <img src="https://starsync.akshaykotish.com/logo.png" alt="Logo" style="height:60px; margin-bottom:20px;">
+    <h1>Futuristic Video Call</h1>
+    <button id="startButton">
+      <i class="fas fa-video" style="margin-right: 10px;"></i>Start Video Call
+    </button>
+  </div>
+  
+  <!-- FULLSCREEN REMOTE VIDEO -->
   <video id="remoteVideo" autoplay playsinline></video>
-
-  <!-- Load Socket.IO client library -->
+  
+  <!-- DRAGGABLE LOCAL VIDEO -->
+  <div id="localVideoContainer">
+    <video id="localVideo" autoplay muted playsinline></video>
+  </div>
+  
+  <!-- LOGO OVERLAY -->
+  <div id="logoOverlay">
+    <img src="https://starsync.akshaykotish.com/logo.png" alt="Logo">
+  </div>
+  
+  <!-- IN-CALL CONTROL BUTTONS -->
+  <div id="callControls" style="display: none;">
+    <!-- Mute Button: Uses unmuted icon by default -->
+    <button id="muteButton" class="control-button">
+      <img src="https://cdn-icons-png.flaticon.com/512/9314/9314521.png" alt="Mic">
+    </button>
+    <!-- Change Camera Button uses custom camera icon -->
+    <button id="changeCameraButton" class="control-button">
+      <img src="https://cdn-icons-png.flaticon.com/512/1817/1817487.png" alt="Camera">
+    </button>
+    <!-- End Call Button uses a red icon -->
+    <button id="endButton" class="control-button">
+      <img src="https://cdn-icons-png.flaticon.com/512/14025/14025253.png" alt="End Call">
+    </button>
+  </div>
+  
+  <!-- ERROR MESSAGE -->
+  <div id="errorMsg"></div>
+  
+  <!-- Socket.IO client library -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    // Utility function to display errors on the page
+    // Define icon URLs for microphone states
+    const micMutedIcon = "https://cdn-icons-png.flaticon.com/512/15751/15751519.png";
+    const micUnmutedIcon = "https://cdn-icons-png.flaticon.com/512/9314/9314521.png";
+    
+    // Utility function to display error messages
     function displayError(message) {
-      document.getElementById('errorMsg').textContent = message;
+      const errorMsg = document.getElementById('errorMsg');
+      errorMsg.textContent = message;
+      errorMsg.style.display = 'block';
+      setTimeout(() => {
+        errorMsg.style.display = 'none';
+      }, 5000);
     }
-
-    // --- Polyfill for getUserMedia ---
+    
+    // Polyfill for getUserMedia in older browsers
     if (navigator.mediaDevices === undefined) {
       navigator.mediaDevices = {};
     }
     if (navigator.mediaDevices.getUserMedia === undefined) {
       navigator.mediaDevices.getUserMedia = function(constraints) {
-        var legacyGetUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        const legacyGetUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
         if (!legacyGetUserMedia) {
           return Promise.reject(new Error('getUserMedia is not implemented in this browser'));
         }
@@ -63,22 +229,33 @@
         });
       };
     }
-    if (!navigator.mediaDevices.getUserMedia) {
-      displayError('Sorry, your browser does not support accessing camera and microphone.');
-      document.getElementById('startButton').disabled = true;
-    }
-
+    
+    // DOM Elements
+    const startOverlay = document.getElementById('startOverlay');
     const startButton = document.getElementById('startButton');
     const localVideo = document.getElementById('localVideo');
     const remoteVideo = document.getElementById('remoteVideo');
+    const localVideoContainer = document.getElementById('localVideoContainer');
+    const callControls = document.getElementById('callControls');
+    const muteButton = document.getElementById('muteButton');
+    const changeCameraButton = document.getElementById('changeCameraButton');
+    const endButton = document.getElementById('endButton');
+    
+    // Initialize Socket.IO for signaling
     const socket = io();
+    
+    // Global variables for media and connection
     let localStream;
     let pc; // RTCPeerConnection instance
-
+    let audioMuted = false;
+    let videoDevices = [];         // Array to store available video devices
+    let currentVideoDeviceId = null;
+    
     const configuration = {
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     };
-
+    
+    // Create the RTCPeerConnection and add local media tracks
     function createPeerConnection() {
       pc = new RTCPeerConnection(configuration);
       localStream.getTracks().forEach(track => {
@@ -93,13 +270,34 @@
         remoteVideo.srcObject = event.streams[0];
       };
     }
-
+    
+    // When the user clicks Start, get media, hide overlay, show controls, and join a room
     startButton.addEventListener('click', async () => {
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localVideo.srcObject = localStream;
-        startButton.style.display = 'none';
-        const room = prompt("Enter room name:");
+        
+        // Hide the start overlay and show call controls
+        startOverlay.style.display = 'none';
+        callControls.style.display = 'flex';
+        
+        // Enumerate devices to enable camera switching
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = devices.filter(device => device.kind === 'videoinput');
+        if (localStream.getVideoTracks().length > 0) {
+          currentVideoDeviceId = localStream.getVideoTracks()[0].getSettings().deviceId;
+        }
+        
+        // Get the room name from the URL parameter "roomname"
+        const params = new URLSearchParams(window.location.search);
+        let room = params.get("roomname");
+        
+        // If no roomname parameter is provided, fall back to prompting the user
+        if (!room) {
+          room = prompt("Enter room name:");
+        }
+        
+        // If a room name was provided, join it
         if (room) {
           socket.emit('join', room);
         }
@@ -108,50 +306,168 @@
         displayError('Error accessing media devices: ' + error.message);
       }
     });
-
-    // --- Socket.IO signaling event handlers ---
-
+    
+    // Socket.IO signaling handlers
     socket.on('joined', () => {
       console.log('Joined room successfully.');
       createPeerConnection();
     });
-
+    
     socket.on('other-user', () => {
       console.log('Another user is in the room. Initiating call...');
       initiateCall();
     });
-
+    
     socket.on('offer', async (offer) => {
       console.log('Received offer:', offer);
       if (!pc) {
         createPeerConnection();
       }
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      await pc.setRemoteDescription(offer);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       socket.emit('answer', answer);
     });
-
+    
     socket.on('answer', async (answer) => {
       console.log('Received answer:', answer);
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      await pc.setRemoteDescription(answer);
     });
-
+    
     socket.on('ice-candidate', async (candidate) => {
       console.log('Received ICE candidate:', candidate);
       try {
         await pc.addIceCandidate(candidate);
       } catch (error) {
-        console.error('Error adding received ICE candidate', error);
+        console.error('Error adding ICE candidate:', error);
         displayError('Error adding ICE candidate: ' + error.message);
       }
     });
-
+    
+    // Initiate the call by sending an offer
     async function initiateCall() {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       socket.emit('offer', offer);
     }
+    
+    // In-call control: Mute/Unmute toggling between two icons
+    muteButton.addEventListener('click', () => {
+      audioMuted = !audioMuted;
+      localStream.getAudioTracks().forEach(track => track.enabled = !audioMuted);
+      const micImg = muteButton.querySelector('img');
+      if (audioMuted) {
+        micImg.src = micMutedIcon;
+      } else {
+        micImg.src = micUnmutedIcon;
+      }
+    });
+    
+    // In-call control: Change Camera
+    changeCameraButton.addEventListener('click', async () => {
+      if (videoDevices.length < 2) {
+        alert("No alternative camera found.");
+        return;
+      }
+      const currentIndex = videoDevices.findIndex(device => device.deviceId === currentVideoDeviceId);
+      const nextIndex = (currentIndex + 1) % videoDevices.length;
+      const nextDeviceId = videoDevices[nextIndex].deviceId;
+      
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { deviceId: { exact: nextDeviceId } },
+          audio: false
+        });
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        
+        // Stop and remove the old video track
+        localStream.getVideoTracks().forEach(track => {
+          track.stop();
+          localStream.removeTrack(track);
+        });
+        localStream.addTrack(newVideoTrack);
+        localVideo.srcObject = localStream;
+        
+        // Replace the track in the peer connection
+        const videoSender = pc.getSenders().find(sender => sender.track && sender.track.kind === 'video');
+        if (videoSender) {
+          videoSender.replaceTrack(newVideoTrack);
+        }
+        currentVideoDeviceId = nextDeviceId;
+      } catch (error) {
+        console.error("Error switching camera:", error);
+        displayError("Error switching camera: " + error.message);
+      }
+    });
+    
+    // In-call control: End Call
+    endButton.addEventListener('click', () => {
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      localVideo.srcObject = null;
+      remoteVideo.srcObject = null;
+      displayError("Call ended.");
+      // Optionally, reload the page to reset the UI
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    });
+    
+    // MAKE THE LOCAL VIDEO DRAGGABLE (for both mouse and touch)
+    (function() {
+      let isDragging = false;
+      let startX, startY, initialLeft, initialTop;
+      
+      localVideoContainer.addEventListener('mousedown', dragStart);
+      localVideoContainer.addEventListener('touchstart', dragStart);
+      
+      function dragStart(e) {
+        isDragging = true;
+        startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
+        startY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
+        const rect = localVideoContainer.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+        document.addEventListener('mousemove', dragMove);
+        document.addEventListener('mouseup', dragEnd);
+        document.addEventListener('touchmove', dragMove, { passive: false });
+        document.addEventListener('touchend', dragEnd);
+      }
+      
+      function dragMove(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
+        const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
+        let newLeft = initialLeft + (clientX - startX);
+        let newTop = initialTop + (clientY - startY);
+        
+        // Constrain movement within viewport
+        const containerRect = localVideoContainer.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        if (newLeft < 0) newLeft = 0;
+        if (newTop < 0) newTop = 0;
+        if (newLeft + containerRect.width > viewportWidth) newLeft = viewportWidth - containerRect.width;
+        if (newTop + containerRect.height > viewportHeight) newTop = viewportHeight - containerRect.height;
+        
+        localVideoContainer.style.left = newLeft + 'px';
+        localVideoContainer.style.top = newTop + 'px';
+      }
+      
+      function dragEnd() {
+        isDragging = false;
+        document.removeEventListener('mousemove', dragMove);
+        document.removeEventListener('mouseup', dragEnd);
+        document.removeEventListener('touchmove', dragMove);
+        document.removeEventListener('touchend', dragEnd);
+      }
+    })();
   </script>
 </body>
 </html>
