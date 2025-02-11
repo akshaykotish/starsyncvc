@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>WebRTC Video Call</title>
+  <!-- Mobile viewport meta tag for proper scaling on iOS -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f2f2f2;
+    }
+    video {
+      width: 45%;
+      border: 1px solid #333;
+      margin: 2%;
+    }
+    #errorMsg {
+      color: red;
+      font-weight: bold;
+      margin: 10px;
+    }
+    #startButton {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebRTC Video Call</h1>
+  <!-- Button to trigger getUserMedia (required on iOS) -->
+  <button id="startButton">Start Video Call</button>
+  <!-- Container to display errors -->
+  <div id="errorMsg"></div>
+  <br>
+  <!-- Video elements for local and remote streams -->
+  <video id="localVideo" autoplay muted playsinline></video>
+  <video id="remoteVideo" autoplay playsinline></video>
+
+  <!-- Load Socket.IO client library -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Utility function to display errors on the page
+    function displayError(message) {
+      document.getElementById('errorMsg').textContent = message;
+    }
+
+    // --- Polyfill for getUserMedia ---
+    if (navigator.mediaDevices === undefined) {
+      navigator.mediaDevices = {};
+    }
+    if (navigator.mediaDevices.getUserMedia === undefined) {
+      navigator.mediaDevices.getUserMedia = function(constraints) {
+        var legacyGetUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        if (!legacyGetUserMedia) {
+          return Promise.reject(new Error('getUserMedia is not implemented in this browser'));
+        }
+        return new Promise(function(resolve, reject) {
+          legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+        });
+      };
+    }
+    if (!navigator.mediaDevices.getUserMedia) {
+      displayError('Sorry, your browser does not support accessing camera and microphone.');
+      document.getElementById('startButton').disabled = true;
+    }
+
+    const startButton = document.getElementById('startButton');
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const socket = io();
+    let localStream;
+    let pc; // RTCPeerConnection instance
+
+    const configuration = {
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    };
+
+    function createPeerConnection() {
+      pc = new RTCPeerConnection(configuration);
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+      });
+      pc.onicecandidate = event => {
+        if (event.candidate) {
+          socket.emit('ice-candidate', event.candidate);
+        }
+      };
+      pc.ontrack = event => {
+        remoteVideo.srcObject = event.streams[0];
+      };
+    }
+
+    startButton.addEventListener('click', async () => {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        startButton.style.display = 'none';
+        const room = prompt("Enter room name:");
+        if (room) {
+          socket.emit('join', room);
+        }
+      } catch (error) {
+        console.error('Error accessing media devices.', error);
+        displayError('Error accessing media devices: ' + error.message);
+      }
+    });
+
+    // --- Socket.IO signaling event handlers ---
+
+    socket.on('joined', () => {
+      console.log('Joined room successfully.');
+      createPeerConnection();
+    });
+
+    socket.on('other-user', () => {
+      console.log('Another user is in the room. Initiating call...');
+      initiateCall();
+    });
+
+    socket.on('offer', async (offer) => {
+      console.log('Received offer:', offer);
+      if (!pc) {
+        createPeerConnection();
+      }
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('answer', answer);
+    });
+
+    socket.on('answer', async (answer) => {
+      console.log('Received answer:', answer);
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    });
+
+    socket.on('ice-candidate', async (candidate) => {
+      console.log('Received ICE candidate:', candidate);
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch (error) {
+        console.error('Error adding received ICE candidate', error);
+        displayError('Error adding ICE candidate: ' + error.message);
+      }
+    });
+
+    async function initiateCall() {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', offer);
+    }
+  </script>
+</body>
+</html>
