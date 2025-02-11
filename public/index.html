@@ -47,10 +47,12 @@
       background: #000;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
+    /* Local video with a slight zoom-out effect */
     #localVideo {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      transform: scale(0.95); /* Adjust scale (0.95) for desired zoom out effect */
     }
     /* LOGO OVERLAY (displayed on top of the video) */
     #logoOverlay {
@@ -89,7 +91,6 @@
     .control-button:hover {
       background: rgba(255,255,255,0.3);
     }
-    /* Ensure images inside control buttons are scaled properly */
     .control-button img {
       width: 50%;
       height: auto;
@@ -138,6 +139,21 @@
       padding: 5px 10px;
       border-radius: 5px;
       display: none;
+    }
+    /* LOG MESSAGE AREA (visible logs in the webview) */
+    #log {
+      position: fixed;
+      bottom: 80px;
+      left: 20px;
+      width: 300px;
+      max-height: 150px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 10px;
+      font-size: 12px;
+      border-radius: 5px;
+      z-index: 7;
     }
     /* Responsive adjustments for mobile devices */
     @media (max-width: 480px) {
@@ -197,6 +213,11 @@
   <!-- ERROR MESSAGE -->
   <div id="errorMsg"></div>
   
+  <!-- LOG MESSAGE AREA -->
+  <div id="log" style="display: none;">
+    <div id="logContent"></div>
+  </div>
+  
   <!-- Socket.IO client library -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -212,6 +233,19 @@
       setTimeout(() => {
         errorMsg.style.display = 'none';
       }, 5000);
+      logMessage("Error: " + message);
+    }
+    
+    // Utility function to log messages to the log area
+    function logMessage(message) {
+        console.log(message);
+      const logContent = document.getElementById('logContent');
+      const timestamp = new Date().toLocaleTimeString();
+      const newLog = document.createElement('div');
+      newLog.textContent = `[${timestamp}] ${message}`;
+      logContent.appendChild(newLog);
+      // Auto-scroll to bottom
+      logContent.scrollTop = logContent.scrollHeight;
     }
     
     // Polyfill for getUserMedia in older browsers
@@ -264,10 +298,12 @@
       pc.onicecandidate = event => {
         if (event.candidate) {
           socket.emit('ice-candidate', event.candidate);
+          logMessage("ICE candidate sent.");
         }
       };
       pc.ontrack = event => {
         remoteVideo.srcObject = event.streams[0];
+        logMessage("Remote track received.");
       };
     }
     
@@ -276,6 +312,7 @@
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localVideo.srcObject = localStream;
+        logMessage("Local media stream acquired.");
         
         // Hide the start overlay and show call controls
         startOverlay.style.display = 'none';
@@ -299,7 +336,10 @@
         
         // If a room name was provided, join it
         if (room) {
+          logMessage("Joining room: " + room);
           socket.emit('join', room);
+        } else {
+          logMessage("No room name provided.");
         }
       } catch (error) {
         console.error('Error accessing media devices.', error);
@@ -309,17 +349,17 @@
     
     // Socket.IO signaling handlers
     socket.on('joined', () => {
-      console.log('Joined room successfully.');
+      logMessage("Joined room successfully.");
       createPeerConnection();
     });
     
     socket.on('other-user', () => {
-      console.log('Another user is in the room. Initiating call...');
+      logMessage("Another user is in the room. Initiating call...");
       initiateCall();
     });
     
     socket.on('offer', async (offer) => {
-      console.log('Received offer:', offer);
+      logMessage("Received offer.");
       if (!pc) {
         createPeerConnection();
       }
@@ -327,15 +367,16 @@
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       socket.emit('answer', answer);
+      logMessage("Answer sent.");
     });
     
     socket.on('answer', async (answer) => {
-      console.log('Received answer:', answer);
+      logMessage("Received answer.");
       await pc.setRemoteDescription(answer);
     });
     
     socket.on('ice-candidate', async (candidate) => {
-      console.log('Received ICE candidate:', candidate);
+      logMessage("Received ICE candidate.");
       try {
         await pc.addIceCandidate(candidate);
       } catch (error) {
@@ -349,6 +390,7 @@
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       socket.emit('offer', offer);
+      logMessage("Offer sent.");
     }
     
     // In-call control: Mute/Unmute toggling between two icons
@@ -358,8 +400,10 @@
       const micImg = muteButton.querySelector('img');
       if (audioMuted) {
         micImg.src = micMutedIcon;
+        logMessage("Audio muted.");
       } else {
         micImg.src = micUnmutedIcon;
+        logMessage("Audio unmuted.");
       }
     });
     
@@ -367,6 +411,7 @@
     changeCameraButton.addEventListener('click', async () => {
       if (videoDevices.length < 2) {
         alert("No alternative camera found.");
+        logMessage("No alternative camera found.");
         return;
       }
       const currentIndex = videoDevices.findIndex(device => device.deviceId === currentVideoDeviceId);
@@ -394,6 +439,7 @@
           videoSender.replaceTrack(newVideoTrack);
         }
         currentVideoDeviceId = nextDeviceId;
+        logMessage("Switched camera to device: " + nextDeviceId);
       } catch (error) {
         console.error("Error switching camera:", error);
         displayError("Error switching camera: " + error.message);
@@ -412,7 +458,8 @@
       localVideo.srcObject = null;
       remoteVideo.srcObject = null;
       displayError("Call ended.");
-      // Optionally, reload the page to reset the UI
+      logMessage("Call ended by user.");
+      // Optionally, reload the page to reset the UI after a short delay
       setTimeout(() => {
         window.location.reload();
       }, 2000);
